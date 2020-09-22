@@ -25,7 +25,7 @@ def train_ssth():
 
     ssth_regressor.fit(X_train,y_train)
     print("Execution ssth completed in -- %s seconds --" % (time.time() - start_time))
-    pickle.dump(ssth_regressor, open( "ssth_regressor.p", "wb" ) )
+    pickle.dump(ssth_regressor, open( "models/ssth_regressor.p", "wb" ) )
 
 def train_ht():
     print("Start training Hoeffding Tree Regressor...")
@@ -36,7 +36,7 @@ def train_ht():
 
     ht_regressor.fit(X_train,y_train)
     print("Execution ht completed in -- %s seconds --" % (time.time() - start_time))
-    pickle.dump(ht_regressor, open( "ht_regressor.p", "wb" ) )
+    pickle.dump(ht_regressor, open( "models/ht_regressor.p", "wb" ) )
 
 def train_all():
     train_ht()

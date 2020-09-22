@@ -21,7 +21,6 @@ from sklearn.metrics import mean_poisson_deviance
 from sklearn.metrics import mean_gamma_deviance
 from sklearn.metrics import mean_tweedie_deviance
 
-max_samples = 1000000
 # plt.ion()
 # plt.show()
 
@@ -46,7 +45,7 @@ def evaluate_cstm():
     plprev_ssth = []
     ssth_mae = []
     ht_mae = []
-    while n_samples < max_samples and stream.has_more_samples():
+    while stream.has_more_samples():
         X, y = stream.next_sample()
         y_ht = ht_regressor.predict(X)
         y_ssth = ssth_regressor.predict(X)[0][0]
@@ -85,58 +84,65 @@ def evaluate_cstm():
 
 
 def predict():
-    print("Starting prediction...")       
     # val_df = pd.read_sql(engine.execute("select * from consumption where integrated = 0 limit 0,10").statement,session.bind)
-    val_df = pd.read_sql(session.query(Consumption).filter(Consumption.integrated == False).limit(5000).statement,session.bind)
+    val_df = pd.read_sql(session.query(Consumption).filter(Consumption.integrated == False).statement,session.bind)
+    print("Data loaded...")
     n_samples = 0
     cnter = 0
+    ht_regressor = pickle.load(open('models/ht_regressor(last=3000013936).p', 'rb'))
+    ssth_regressor = pickle.load(open('models/ssth_regressor(last=3000013936).p', 'rb'))
+    print("Models Loaded...")
+    client_ids = []
+    print("Starting prediction...")       
     for client_id in val_df.client_id.unique():
         
-
         start_time = time.time()
         
         df = val_df[val_df['client_id']==client_id].drop(columns=['id','client_id','year','month','integrated'])
-        ht_regressor = pickle.load(open('ht_regressor.p', 'rb'))
-        ssth_regressor = pickle.load(open('ssth_regressor.p', 'rb'))
+
         stream = DataStream(data = df,target_idx=0)
 
         plr = []
         plprev_ht = []
         plprev_ssth = []
-        while n_samples < max_samples and stream.has_more_samples():
+        while stream.has_more_samples():
             X, y = stream.next_sample()
-            y_ht = ht_regressor.predict(X)
-            y_ssth = ssth_regressor.predict(X)[0][0]
             ht_regressor.partial_fit(X, y)
             ssth_regressor.partial_fit(X, y)
+            y_ht = ht_regressor.predict(X)
+            y_ssth = ssth_regressor.predict(X)[0][0]
+            # plprev_ht.append(y_ht)
+            # plprev_ssth.append(y_ssth)
+            # plr.append(y)
             n_samples += 1
-            plr.append(y)
-            plprev_ht.append(y_ht)
-            plprev_ssth.append(y_ssth)
-        cnter+=1
-        print("Updtading ",client_id)
-        update(Consumption).where(Consumption.client_id == client_id). \
-                            values(integrated = 1)
+            
+        cnter+=1        
+        if(client_id not in client_ids): client_ids.append(client_id)
 
-        if(cnter % 500 == 0 and len(plr) > 0):
+        if(cnter % 500 == 0 ):
+            
             fig, ax = plt.subplots(figsize=(15, 6))
             plt.plot(range(len(plr)),plr,'b-',label='Real')
             plt.plot(range(len(plprev_ht)),plprev_ht,'g--',label='HoeffdingTreeRegressor')
             plt.plot(range(len(plprev_ssth)),plprev_ssth, 'y--',label='StackedSingleTargetHoeffdingTreeRegressor')
             plt.legend()
-            ht_mse = mean_squared_error(plr,plprev_ht)
-            ssth_mse = mean_squared_error(plr,plprev_ssth)
-            plt.title("HT MSE:" + str(ht_mse) + "SSTH MSE:" + str(ssth_mse))
-            print("Ht mse: ",ht_mse)
-            print("SSTH mse: ",ssth_mse)
-            filename = "images/predictionMSE" + client_id + ".png"
+            # ht_mse = mean_squared_error(plr,plprev_ht)
+            # ssth_mse = mean_squared_error(plr,plprev_ssth)
+            plt.title(client_id)
+            filename = "images/prediction" + client_id + ".png"
             plt.savefig(filename)
             plt.close()
-            pickle.dump(ht_regressor, open( "models/ht_regressor(samples="+str(n_samples)+").p", "wb" ) )
-            pickle.dump(ssth_regressor, open( "models/ssth_regressor(samples="+str(n_samples)+").p", "wb" ) )
-            #Updating 
+            pickle.dump(ht_regressor, open( "models/ht_regressor(last="+client_id+").p", "wb" ) )
+            pickle.dump(ssth_regressor, open( "models/ssth_regressor(last="+client_id+").p", "wb" ) )
+            #Updating
+            print("Updating from ", client_ids[0]," to ", client_ids[-1])
 
-        print("Execution--- %s seconds ---" % (time.time() - start_time))
+            engine.execute("UPDATE Consumption \
+                    SET integrated = 1 \
+                    WHERE client_id in( "+ ''.join(client_ids) + ")") 
+            
+            print("Updated")
+            print("Execution %d --- %s seconds ---" % (cnter, time.time() - start_time))
     # except :
     #     pickle.dump(ht_regressor, open( "models/ht_regressor(samples="+str(n_samples)+").p", "wb" ) )
     #     pickle.dump(ssth_regressor, open( "models/ssth_regressor(samples="+str(n_samples)+").p", "wb" ) )
@@ -150,12 +156,12 @@ def predict2():
     val_df = pd.read_sql(session.query(Consumption).filter(Consumption.integrated == False).statement,session.bind)
     n_samples = 0
     print("Loading Models...")
-    ht_regressor0 = pickle.load(open('ht_regressor.p', 'rb'))
-    ht_regressor1 = pickle.load(open('ht_regressor(samples=7000).p', 'rb'))
-    ht_regressor2 = pickle.load(open('ht_regressor(samples=30000).p', 'rb'))
-    ssth_regressor0 = pickle.load(open('ssth_regressor.p', 'rb'))
-    ssth_regressor1 = pickle.load(open('ssth_regressor(samples=7000).p', 'rb'))
-    ssth_regressor2 = pickle.load(open('ssth_regressor(samples=30000).p', 'rb'))
+    ht_regressor0 = pickle.load(open('models\ht_regressor.p', 'rb'))
+    ht_regressor1 = pickle.load(open('models\ht_regressor(last=3000012178).p', 'rb'))
+    ht_regressor2 = pickle.load(open('models\ht_regressor(last=3000013936).p', 'rb'))
+    ssth_regressor0 = pickle.load(open('models\ssth_regressor.p', 'rb'))
+    ssth_regressor1 = pickle.load(open('models\ht_regressor(last=3000012178).p', 'rb'))
+    ssth_regressor2 = pickle.load(open('models\ssth_regressor(last=3000013936).p', 'rb'))
     print("Starting prediction...")       
     for client_id in val_df.client_id.unique():
 
@@ -173,7 +179,7 @@ def predict2():
         plprev_ssth1 = []
         plprev_ht2 = []
         plprev_ssth2 = []
-        while n_samples < max_samples and stream.has_more_samples():
+        while stream.has_more_samples():
             n_samples += 1
             X, y = stream.next_sample()
             if(n_samples %1000 == 0): print(n_samples)
