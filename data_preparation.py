@@ -66,11 +66,11 @@ def extract_features(raw_row, window_size):
 def execute_extraction(window_size,num_to_process):
     start_time = time.time()
     last_client =  engine.execute("SELECT max(client_id) FROM Consumption").first()[0] or '1'
-    print("Last",last_client)
+    print("[ETL - extraction] Last client integrated:",last_client)
     with open('.\consumo.csv', 'r', newline='', encoding='utf-8') as csvfile:
         d_reader = csv.DictReader(csvfile)
         start_time = time.time()
-        print("Starting...")
+        print("[ETL - extraction] Starting...")
         futures = []
         for count,row in enumerate(d_reader):
             if(count < num_to_process):
@@ -78,9 +78,9 @@ def execute_extraction(window_size,num_to_process):
                 if(client_id) > last_client:
                     a = extract_features(row, window_size)
 
-                    if(count % 100 == 0): print('row',count)
+                    if(count % 1000 == 0): print('[ETL - extraction] Extracting row ',count)
             else: break
                     
 
 
-    print("Execution %d--- seconds ---" % (time.time() - start_time))
+    print("[ETL - extraction] Execution %d--- seconds ---" % (time.time() - start_time))
