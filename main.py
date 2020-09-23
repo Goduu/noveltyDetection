@@ -3,7 +3,9 @@ from model_training import train_all
 from prediction import predict,predict2, evaluate,evaluate_cstm
 
 
-execute_extraction(4,100000)
+# execute_extraction(4,10000)
 
 # train_all()
-predict()
+# execute_extraction(4,55000)
+
+predict2()

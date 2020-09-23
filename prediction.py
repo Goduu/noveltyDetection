@@ -83,20 +83,19 @@ def evaluate_cstm():
     print("Execution--- %s seconds ---" % (time.time() - start_time))
 
 
-def predict():
+def predict(ht_regressor,ssth_regressor):
     # val_df = pd.read_sql(engine.execute("select * from consumption where integrated = 0 limit 0,10").statement,session.bind)
-    val_df = pd.read_sql(session.query(Consumption).filter(Consumption.integrated == False).statement,session.bind)
-    print("Data loaded...")
-    n_samples = 0
+    val_df = pd.read_sql(session.query(Consumption).filter(Consumption.integrated == False).limit(1000000).statement,session.bind)
+    print("[ML - modIncrement] Data loaded...")
+    n_samples = 0   
     cnter = 0
-    ht_regressor = pickle.load(open('models/ht_regressor(last=3000013936).p', 'rb'))
-    ssth_regressor = pickle.load(open('models/ssth_regressor(last=3000013936).p', 'rb'))
-    print("Models Loaded...")
+    # ht_regressor = pickle.load(open('models/ht_regressorRecent.p', 'rb'))
+    # ssth_regressor = pickle.load(open('models/ssth_regressorRecent.p', 'rb'))
+    # print("[ML - modIncrement] Models Loaded...")
     client_ids = []
-    print("Starting prediction...")       
+    print("[ML - modIncrement] Starting model incremental fitting...")   
+    start_time = time.time()    
     for client_id in val_df.client_id.unique():
-        
-        start_time = time.time()
         
         df = val_df[val_df['client_id']==client_id].drop(columns=['id','client_id','year','month','integrated'])
 
@@ -109,17 +108,18 @@ def predict():
             X, y = stream.next_sample()
             ht_regressor.partial_fit(X, y)
             ssth_regressor.partial_fit(X, y)
-            y_ht = ht_regressor.predict(X)
-            y_ssth = ssth_regressor.predict(X)[0][0]
+            if(cnter % 2000 == 0 ):
+                y_ht = ht_regressor.predict(X)
+                y_ssth = ssth_regressor.predict(X)[0][0]
+                plr.append(y)
             # plprev_ht.append(y_ht)
             # plprev_ssth.append(y_ssth)
-            # plr.append(y)
             n_samples += 1
             
         cnter+=1        
         if(client_id not in client_ids): client_ids.append(client_id)
 
-        if(cnter % 500 == 0 ):
+        if(cnter % 2000 == 0 ):
             
             fig, ax = plt.subplots(figsize=(15, 6))
             plt.plot(range(len(plr)),plr,'b-',label='Real')
@@ -135,20 +135,26 @@ def predict():
             pickle.dump(ht_regressor, open( "models/ht_regressor(last="+client_id+").p", "wb" ) )
             pickle.dump(ssth_regressor, open( "models/ssth_regressor(last="+client_id+").p", "wb" ) )
             #Updating
-            print("Updating from ", client_ids[0]," to ", client_ids[-1])
+            print("[ML - modIncrement] Updating from ", client_ids[0]," to ", client_ids[-1])
 
             engine.execute("UPDATE Consumption \
                     SET integrated = 1 \
-                    WHERE client_id in( "+ ''.join(client_ids) + ")") 
+                    WHERE client_id in( "+ ','.join(client_ids) + ")") 
             
-            print("Updated")
-            print("Execution %d --- %s seconds ---" % (cnter, time.time() - start_time))
-    # except :
-    #     pickle.dump(ht_regressor, open( "models/ht_regressor(samples="+str(n_samples)+").p", "wb" ) )
-    #     pickle.dump(ssth_regressor, open( "models/ssth_regressor(samples="+str(n_samples)+").p", "wb" ) )
-    #     update(Consumption).where(Consumption.client_id == client_id). \
-    #                             values(integrated = 1)
-    #     print("[Error]",er)
+            print("[ML - modIncrement] Updated")
+            print("[ML - modIncrement] Execution %d --- %s seconds ---" % (cnter, time.time() - start_time))
+    
+    #Updating
+
+    pickle.dump(ht_regressor, open( "models/ht_regressorRecent.p", "wb" ) )
+    pickle.dump(ssth_regressor, open( "models/ssth_regressorRecent.p", "wb" ) )
+    if(len(client_ids) > 0):
+        print("[ML - modIncrement] Final updating from ", client_ids[0]," to ", client_ids[-1])
+        engine.execute("UPDATE Consumption \
+                SET integrated = 1 \
+                WHERE client_id in( "+ ','.join(client_ids) + ")")
+    
+    return ht_regressor,ssth_regressor
 
 
 
@@ -157,11 +163,11 @@ def predict2():
     n_samples = 0
     print("Loading Models...")
     ht_regressor0 = pickle.load(open('models\ht_regressor.p', 'rb'))
-    ht_regressor1 = pickle.load(open('models\ht_regressor(last=3000012178).p', 'rb'))
-    ht_regressor2 = pickle.load(open('models\ht_regressor(last=3000013936).p', 'rb'))
-    ssth_regressor0 = pickle.load(open('models\ssth_regressor.p', 'rb'))
-    ssth_regressor1 = pickle.load(open('models\ht_regressor(last=3000012178).p', 'rb'))
-    ssth_regressor2 = pickle.load(open('models\ssth_regressor(last=3000013936).p', 'rb'))
+    # ht_regressor1 = pickle.load(open('models\ht_regressor(last=3000072814).p', 'rb'))
+    ht_regressor2 = pickle.load(open('models\ht_regressorRecent.p', 'rb'))
+    # ssth_regressor0 = pickle.load(open('models\ssth_regressor.p', 'rb'))
+    # ssth_regressor1 = pickle.load(open('models\ssth_regressor(last=3000072814).p', 'rb'))
+    # ssth_regressor2 = pickle.load(open('models\ssth_regressorRecent.p', 'rb'))
     print("Starting prediction...")       
     for client_id in val_df.client_id.unique():
 
@@ -186,43 +192,43 @@ def predict2():
 
             if(n_samples > 30000):
                 y_ht0 = ht_regressor0.predict(X)
-                y_ssth0 = ssth_regressor0.predict(X)[0][0]
-                y_ht1 = ht_regressor1.predict(X)
-                y_ssth1 = ssth_regressor1.predict(X)[0][0]
+                # y_ssth0 = ssth_regressor0.predict(X)[0][0]
+                # y_ht1 = ht_regressor1.predict(X)
+                # y_ssth1 = ssth_regressor1.predict(X)[0][0]
                 y_ht2 = ht_regressor2.predict(X)
-                y_ssth2 = ssth_regressor2.predict(X)[0][0]
+                # y_ssth2 = ssth_regressor2.predict(X)[0][0]
                 plr.append(y)
                 plprev_ht0.append(y_ht0)
-                plprev_ssth0.append(y_ssth0)
-                plprev_ht1.append(y_ht1)
-                plprev_ssth1.append(y_ssth1)
+                # plprev_ssth0.append(y_ssth0)
+                # plprev_ht1.append(y_ht1)
+                # plprev_ssth1.append(y_ssth1)
                 plprev_ht2.append(y_ht2)
-                plprev_ssth2.append(y_ssth2)
+                # plprev_ssth2.append(y_ssth2)
                 cnter+=1
-        if(n_samples > 30000):
+        if(n_samples > 5 and len(plr)>0):
             print('ploting alcapaha')
             fig, ax = plt.subplots(figsize=(15, 6))
             plt.plot(range(len(plr)),plr,'b-',label='Real')
+            # plt.plot(range(len(plprev_ssth0)),plprev_ssth0, 'r--',label='StackedSingleTargetHoeffdingTreeRegressor0')
+            # plt.plot(range(len(plprev_ssth1)),plprev_ssth1, 'm--',label='StackedSingleTargetHoeffdingTreeRegressor1')
+            # plt.plot(range(len(plprev_ssth2)),plprev_ssth2, 'k--',label='StackedSingleTargetHoeffdingTreeRegressor2')
             plt.plot(range(len(plprev_ht0)),plprev_ht0,'g--',label='HoeffdingTreeRegressor0')
-            plt.plot(range(len(plprev_ssth0)),plprev_ssth0, 'r--',label='StackedSingleTargetHoeffdingTreeRegressor0')
-            plt.plot(range(len(plprev_ht1)),plprev_ht1,'c--',label='HoeffdingTreeRegressor1')
-            plt.plot(range(len(plprev_ssth1)),plprev_ssth1, 'm--',label='StackedSingleTargetHoeffdingTreeRegressor1')
+            # plt.plot(range(len(plprev_ht1)),plprev_ht1,'c--',label='HoeffdingTreeRegressor1')
             plt.plot(range(len(plprev_ht2)),plprev_ht2,'y--',label='HoeffdingTreeRegressor2')
-            plt.plot(range(len(plprev_ssth2)),plprev_ssth2, 'k--',label='StackedSingleTargetHoeffdingTreeRegressor2')
             plt.legend()
-            ht_mse = mean_squared_error(plr,plprev_ht0)
-            ssth_mse = mean_squared_error(plr,plprev_ssth0)
-            print("Ht mse0: ",ht_mse)
-            print("SSTH mse0: ",ssth_mse)
-            ht_mse = mean_squared_error(plr,plprev_ht1)
-            ssth_mse = mean_squared_error(plr,plprev_ssth1)
-            print("Ht mse1: ",ht_mse)
-            print("SSTH mse1: ",ssth_mse)
-            ht_mse = mean_squared_error(plr,plprev_ht2)
-            ssth_mse = mean_squared_error(plr,plprev_ssth2)
-            print("Ht mse2: ",ht_mse)
-            print("SSTH mse2: ",ssth_mse)
-            filename = "images/predictionComparison" + client_id + ".png"
+            ht_mse0 = mean_squared_error(plr,plprev_ht0)
+            # ht_mse1 = mean_squared_error(plr,plprev_ht1)
+            ht_mse2 = mean_squared_error(plr,plprev_ht2)
+            # ssth_mse0 = mean_squared_error(plr,plprev_ssth1)
+            # ssth_mse1 = mean_squared_error(plr,plprev_ssth0)
+            # ssth_mse2 = mean_squared_error(plr,plprev_ssth2)
+            print("Ht mse0: ",ht_mse0)
+            # print("Ht mse1: ",ht_mse1)
+            print("Ht mse2: ",ht_mse2)
+            # print("SSTH mse0: ",ssth_mse0)
+            # print("SSTH mse1: ",ssth_mse1)
+            # print("SSTH mse2: ",ssth_mse2)
+            filename = "images/comparisson/ComparisonPrediction" + client_id + ".png"
             plt.savefig(filename)
             plt.close()
 
