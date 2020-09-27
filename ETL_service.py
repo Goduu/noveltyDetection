@@ -1,8 +1,16 @@
 
 from data_preparation import execute_extraction
 import time
+from db_conexion import logging
+import sys 
 
-for i in range(75000,10000000,5000):
-    print("[ETL] Executing... ", i)
-    execute_extraction(4,i)
-    time.sleep(1)
+try:
+    for i in range(1000000,10000000,5000):
+        logging.info("[ETL] Executing... " + str(i))
+        execute_extraction(12,i)
+        time.sleep(30)
+except:
+    logging.error("[ETL] Stopping...")
+    sys.exit(1)
+    
+        
