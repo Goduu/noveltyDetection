@@ -79,7 +79,7 @@ from sqlalchemy import func
 def execute_extraction(window_size,num_to_process):
     start_time = time.time()
     last_client =  engine.execute("SELECT max(client_id) FROM Consumption").first()[0] or '1'
-    logging.info("[ETL - extraction] Last client integrated: "+ last_client + " Time: " + str(round(time.time() - start_time,2)))
+    logging.info("[ETL - extraction] Last client added: "+ last_client + " Time: " + str(round(time.time() - start_time,2)))
     with open('.\consumo.csv', 'r', newline='', encoding='utf-8') as csvfile:
         d_reader = csv.DictReader(csvfile)
         start_time = time.time()

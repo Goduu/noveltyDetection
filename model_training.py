@@ -11,7 +11,7 @@ from sqlalchemy import update
 
 sys.setrecursionlimit(6500)
 
-table_df = pd.read_sql(session.query(Consumption).filter(Consumption.integrated == False).statement,session.bind)
+table_df = pd.read_sql(session.query(Consumption).filter(Consumption.integrated == True).statement,session.bind)
 
 X_train = table_df.drop(columns=['value','client_id','year','integrated','month','id'], axis=1).to_numpy()
 y_train = table_df['value'].to_numpy()

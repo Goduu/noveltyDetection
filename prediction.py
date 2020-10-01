@@ -90,13 +90,14 @@ def increment_model(ht_regressor):
         start_time = time.time() 
         # val_df = pd.read_sql(engine.execute("select * from consumption where integrated = 0 limit 0,10").statement,session.bind)
         logging.info("[ML - modIncrement] Loading data... Time: " + str(round(time.time() - start_time,2))   )
-        val_df = pd.read_sql(session.query(Consumption).filter(Consumption.integrated == False).limit(1000000).statement,session.bind)
+        val_df = pd.read_sql(session.query(Consumption).filter(Consumption.integrated == False).limit(2000000).statement,session.bind)
         logging.info("[ML - modIncrement] Data loaded... Time: " + str(round(time.time() - start_time,2)))
         n_samples = 0   
         cnter = 0
         client_ids = []
         logging.info("[ML - modIncrement] Starting model incremental fitting... Time: " + str(round(time.time() - start_time,2)))
         client_id_max = max(val_df.client_id.unique())
+        client_id_min = min(val_df.client_id.unique())
         df = val_df.drop(columns=['id','client_id','year','month','integrated'])
 
         stream = DataStream(data = df,target_idx=0)
@@ -129,7 +130,7 @@ def increment_model(ht_regressor):
         #Updating
         
         logging.info("[ML - modIncrement] Execution %d --- %s seconds ---" % (cnter, round(time.time() - start_time,2)))
-        return ht_regressor
+        return ht_regressor,client_id_min,client_id_max
     except:
         logging.error("[ML - modIncrement] Stopping...")
         # logging.info("[ML - modIncrement] Saving model at 'models/ht_regressor12F'...")
@@ -140,7 +141,7 @@ def increment_model(ht_regressor):
         #         WHERE client_id <=" + client_id_max)
         
         # logging.info("[ML - modIncrement] Updated")
-        return ht_regressor
+        # return ht_regressor,client_id_min,client_id_max
         
     
 
