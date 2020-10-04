@@ -71,7 +71,7 @@ def extract_features(raw_row, window_size):
             break
         except:
             attempt += 1
-            logging.error("[ETL - extraction] Fail to save in DB attempt"+str(attempt)+ "/10")
+            logging.error("[ETL - extraction] Fail to save in DB attempt"+str(attempt)+ "/15")
             continue
     
 from sqlalchemy import func 
@@ -91,7 +91,8 @@ def execute_extraction(window_size,num_to_process):
                 if(client_id) > last_client:
                     a = extract_features(row, window_size)
 
-                    if(count % 1000 == 0): logging.info('[ETL - extraction] Extracting row ' + str(count)+ " client: " + client_id)
+                    if(count % 1000 == 0):
+                        logging.info('[ETL - extraction] Extracting row ' + str(count)+ " client: " + client_id + " Time: " + str(round(time.time() - start_time,2)))
             else: break
                     
 
