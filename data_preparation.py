@@ -2,10 +2,13 @@ from sklearn.impute import SimpleImputer
 from numpy import nan
 import numpy as np
 import time
-from db_conexion import engine
+from db_conexion import engine, session
+from Consumption import Consumption
 import csv
 from numpy import std, mean
 import pandas as pd
+from db_conexion import logging
+
 
 def get_years_months(y,m, lenght):
     y,m = get_start_month(y,m,lenght)
@@ -60,17 +63,27 @@ def extract_features(raw_row, window_size):
     features['movStd'] = [std(row[vi-ms_vec[vi]:vi]) if vi>1 else 0 for vi,val in enumerate(row)]
     features['integrated'] = False
     df = pd.DataFrame(features)
-    df = df[df['dif4'] != 0]
-    df.to_sql('Consumption', con=engine, if_exists='append',index=False)
+    df = df[df['dif12'] != 0]
+    for attempt in range(15):
+        try:
+            if(attempt > 15): break
+            df.to_sql('Consumption', con=engine, if_exists='append',index=False)
+            break
+        except:
+            attempt += 1
+            logging.error("[ETL - extraction] Fail to save in DB attempt"+str(attempt)+ "/15")
+            continue
+    
+from sqlalchemy import func 
 
 def execute_extraction(window_size,num_to_process):
     start_time = time.time()
     last_client =  engine.execute("SELECT max(client_id) FROM Consumption").first()[0] or '1'
-    print("[ETL - extraction] Last client integrated:",last_client)
+    logging.info("[ETL - extraction] Last client added: "+ last_client + " Time: " + str(round(time.time() - start_time,2)))
     with open('.\consumo.csv', 'r', newline='', encoding='utf-8') as csvfile:
         d_reader = csv.DictReader(csvfile)
         start_time = time.time()
-        print("[ETL - extraction] Starting...")
+        logging.info("[ETL - extraction] Starting...")
         futures = []
         for count,row in enumerate(d_reader):
             if(count < num_to_process):
@@ -78,9 +91,10 @@ def execute_extraction(window_size,num_to_process):
                 if(client_id) > last_client:
                     a = extract_features(row, window_size)
 
-                    if(count % 1000 == 0): print('[ETL - extraction] Extracting row ',count)
+                    if(count % 1000 == 0):
+                        logging.info('[ETL - extraction] Extracting row ' + str(count)+ " client: " + client_id + " Time: " + str(round(time.time() - start_time,2)))
             else: break
                     
 
 
-    print("[ETL - extraction] Execution %d--- seconds ---" % (time.time() - start_time))
+    logging.info("[ETL - extraction] Execution %d--- seconds ---" % round(time.time() - start_time,2))
