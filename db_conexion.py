@@ -14,6 +14,9 @@ logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 
 engine = create_engine('sqlite:///database.db')
 engine_clustering = create_engine('sqlite:///databaseClustering.db')
+engine_inspection = create_engine('sqlite:///inspectionsDatabase.db')
+
 
 session_factory  = sessionmaker(bind=engine)
 session = scoped_session(session_factory )
+

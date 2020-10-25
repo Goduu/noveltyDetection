@@ -86,6 +86,7 @@ def execute_extraction(window_size,num_to_process):
         logging.info("[ETL - extraction] Starting...")
         futures = []
         for count,row in enumerate(d_reader):
+            if(count%10000==0): print("Counting....",count + str(round(time.time() - start_time,2)))
             if(count < num_to_process):
                 client_id = row.get("COD_INSTALACAO")
                 if(client_id) > last_client:

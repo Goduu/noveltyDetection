@@ -7,7 +7,7 @@ from db_conexion import logging
 import sys
 
 logging.info("[ML] Loading Models...")
-ht_regressor = pickle.load(open('models/ht_regressor12F48.p', 'rb'))
+ht_regressor = pickle.load(open('models/ht_regressor12F74.p', 'rb'))
 
 logging.info("[ML] Models Loaded...")
 
@@ -24,7 +24,7 @@ def get_integrate():
     return 
 # try:
 start_time = time.time()
-counter = 49
+counter = 75
 while True:
     while get_integrate() == 0:
         logging.info("[ML] Waiting new data..."+str(round(time.time() - start_time,2)))
