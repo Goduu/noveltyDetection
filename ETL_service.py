@@ -5,7 +5,7 @@ from db_conexion import logging
 import sys 
 
 try:
-    for i in range(3900000,10000000,100000):
+    for i in range(6000000,10000000,100000):
         logging.info("[ETL] Executing... " + str(i))
         execute_extraction(12,i)
         time.sleep(30)
