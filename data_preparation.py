@@ -8,6 +8,7 @@ import csv
 from numpy import std, mean
 import pandas as pd
 from db_conexion import logging
+from sqlalchemy import func 
 
 
 def get_years_months(y,m, lenght):
@@ -43,8 +44,11 @@ def extract_features(raw_row, window_size):
     year = int(refMonth.split(":")[0])
     month = int(refMonth.split(":")[1])
     client_id = raw_row.get("COD_INSTALACAO")
+
+
     raw_row.pop("MES_REF"); raw_row.pop("COD_INSTALACAO"); raw_row.pop("OPERANDO")
-    #Trata os pontos sem dados
+
+    #Treats the missing data
     row = [[ float(val) if val != '.' else np.nan for val in raw_row.values()][::-1]]
     imp_mean.fit(row)
     row = imp_mean.transform(row)
@@ -56,14 +60,17 @@ def extract_features(raw_row, window_size):
     features['client_id'] = client_id
     features['year'],features['month'] = get_years_months(year,month,len(row))
     features['value'] = row
+
     for i in range(window_size):
         features['v'+str(i+1)] = [ row[vi-i-1] if vi > i else 0 for vi,val in enumerate(row)]
         features['dif'+str(i+1)] = [row[vi-i-1]-row[vi-i-2] if vi > i+1 else 0 for vi,v in enumerate(row)]
+    
     features['movAvg'] = [mean(row[vi-ms_vec[vi]:vi]) if vi>1 else 0 for vi,val in enumerate(row)]
     features['movStd'] = [std(row[vi-ms_vec[vi]:vi]) if vi>1 else 0 for vi,val in enumerate(row)]
     features['integrated'] = False
     df = pd.DataFrame(features)
     df = df[df['dif12'] != 0]
+
     for attempt in range(15):
         try:
             if(attempt > 15): break
@@ -73,8 +80,6 @@ def extract_features(raw_row, window_size):
             attempt += 1
             logging.error("[ETL - extraction] Fail to save in DB attempt"+str(attempt)+ "/15")
             continue
-    
-from sqlalchemy import func 
 
 def execute_extraction(window_size,num_to_process):
     start_time = time.time()
@@ -84,7 +89,7 @@ def execute_extraction(window_size,num_to_process):
         d_reader = csv.DictReader(csvfile)
         start_time = time.time()
         logging.info("[ETL - extraction] Starting...")
-        futures = []
+
         for count,row in enumerate(d_reader):
             if(count%10000==0): print("Counting....",count + str(round(time.time() - start_time,2)))
             if(count < num_to_process):
